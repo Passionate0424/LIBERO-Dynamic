@@ -165,6 +165,11 @@ class OpenPIWebsocketPolicy:
         self.required_action_history_steps = int(
             self.server_metadata.get("required_action_history_steps", 0)
         )
+        # Policies whose chunks can be shorter than --replan-steps (LingBot's first chunk has 12
+        # executable steps) declare it; their short chunks are executed in full.
+        self.allows_short_action_chunks = bool(
+            self.server_metadata.get("allows_short_action_chunks", False)
+        )
 
     def reset(self) -> None:
         self.client.reset()
@@ -247,7 +252,7 @@ class OpenPIWebsocketPolicy:
         actions = np.asarray(result["actions"], dtype=np.float32)
         if actions.ndim == 1:
             actions = actions.reshape(1, -1)
-        if len(actions) < self.replan_steps:
+        if len(actions) == 0 or (len(actions) < self.replan_steps and not self.allows_short_action_chunks):
             raise RuntimeError(
                 f"OpenPI returned {len(actions)} actions, shorter than --replan-steps {self.replan_steps}."
             )
